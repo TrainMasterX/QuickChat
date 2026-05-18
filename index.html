@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuickChat App with Games</title>
+    <title>QuickChat App Live</title>
+    <!-- Include the Ably Live Messaging Network Library -->
+    <script src="https://ably.com"></script>
     <style>
         :root {
             --bg-color: #e5ddd5;
@@ -230,7 +232,6 @@
         .action-btn:hover { background-color: var(--primary-color); }
         .back-btn { background: none; border: none; color: white; cursor: pointer; font-size: 1rem; }
 
-        /* Games Menu Drawer Overlay */
         .games-menu {
             position: absolute;
             bottom: 65px;
@@ -260,7 +261,6 @@
         }
         .game-menu-item:hover { background: #e2e5e9; }
 
-        /* --- GAME ENGINE STYLE BLOCKS --- */
         .game-title {
             font-size: 0.85rem;
             font-weight: bold;
@@ -279,7 +279,6 @@
             color: #444;
         }
 
-        /* Tic-Tac-Toe Bubble Mod */
         .msg-ttt { width: 240px; }
         .ttt-grid {
             display: grid;
@@ -304,38 +303,35 @@
         .ttt-cell.taken { cursor: not-allowed; }
         .ttt-cell:hover:not(.taken) { background: #f0f2f5; }
 
-        /* Connect 4 Bubble Mod */
         .msg-c4 { width: 290px; }
         .c4-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             gap: 4px;
-            background-color: #0b53a7; /* Standard board blue */
+            background-color: #0b53a7;
             padding: 6px;
             border-radius: 8px;
         }
         .c4-cell {
-            background: #f0f2f5; /* Empty slot look */
+            background: #f0f2f5;
             aspect-ratio: 1;
             border-radius: 50%;
             cursor: pointer;
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
         }
-        .c4-cell.p1 { background: #ea0038; cursor: not-allowed; } /* Red Player */
-        .c4-cell.p2 { background: #ffd000; cursor: not-allowed; } /* Yellow Player */
+        .c4-cell.p1 { background: #ea0038; cursor: not-allowed; }
+        .c4-cell.p2 { background: #ffd000; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- 1. LOBBY SCREEN -->
     <div id="lobby-screen" class="screen active">
         <h1>QuickChat</h1>
         <button class="btn btn-primary" onclick="showScreen('host-screen'); generateChatCode();">Start a Chat</button>
         <button class="btn btn-secondary" onclick="showScreen('join-screen')">Join a Chat</button>
     </div>
 
-    <!-- 2. HOST SCREEN -->
     <div id="host-screen" class="screen">
         <div class="setup-box">
             <h2>Host a Chat Room</h2>
@@ -349,7 +345,6 @@
         </div>
     </div>
 
-    <!-- 3. JOIN SCREEN -->
     <div id="join-screen" class="screen">
         <div class="setup-box">
             <h2>Join Room</h2>
@@ -363,7 +358,6 @@
         </div>
     </div>
 
-    <!-- 4. CHAT WINDOW SCREEN -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
             <button class="back-btn" onclick="leaveChat()">✕ Leave</button>
@@ -371,11 +365,8 @@
             <div id="user-role" style="font-size: 0.8rem; opacity: 0.8;"></div>
         </div>
         
-        <div class="chat-messages" id="chat-messages-container">
-            <!-- Items populate here dynamically -->
-        </div>
+        <div class="chat-messages" id="chat-messages-container"></div>
 
-        <!-- Hidden Games Menu Drawer Overlay -->
         <div id="games-drawer" class="games-menu">
             <div class="game-menu-item" onclick="spawnTicTacToe()">❌ Tic-Tac-Toe ⭕</div>
             <div class="game-menu-item" onclick="spawnConnectFour()">🔴 Connect 4 🟡</div>
@@ -390,9 +381,15 @@
 </div>
 
 <script>
+    // PASTE YOUR SAFE PUBLISHABLE KEY HERE
+    const ABLY_PUBLISHABLE_KEY = "sb_publishable_4CCHmmMsBwaNrw1qwJKO0Q_jFHYrehV";
+
+    let ablyClient;
+    let chatChannel;
     let currentRoomCode = "";
     let myNickname = ""; 
-    let playerRole = ""; // Host is "X" (P1), Guest is "O" (P2)
+    let playerRole = ""; 
+    let chatHistory = []; // Keeps track of local messages array
 
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -461,10 +458,23 @@
         document.getElementById('active-room-id').innerText = currentRoomCode;
         document.getElementById('user-role').innerText = `${myNickname} (${playerRole === "X" ? "Red" : "Yellow"})`;
         
-        showScreen('chat-screen');
-        loadMessages();
+        // Connect to Ably Messaging Server Network
+        if (ABLY_PUBLISHABLE_KEY === "sb_publishable_4CCHmmMsBwaNrw1qwJKO0Q_jFHYrehV") {
+            alert("Error: You forgot to insert your Ably API key on line 197!");
+            return;
+        }
 
-        window.addEventListener('storage', handleStorageUpdate);
+        ablyClient = new Ably.Realtime(ABLY_PUBLISHABLE_KEY);
+        chatChannel = ablyClient.channels.get(`room_${currentRoomCode}`);
+
+        // Listen for data coming from the internet
+        chatChannel.subscribe('message_packet', (ablyMessage) => {
+            chatHistory = ablyMessage.data;
+            renderMessages();
+        });
+
+        showScreen('chat-screen');
+        renderMessages();
     }
 
     function toggleGamesDrawer() {
@@ -473,6 +483,11 @@
 
     function handleKeyPress(e) {
         if (e.key === 'Enter') sendMessage();
+    }
+
+    function sendPayloadToNetwork() {
+        // Broadcasts the updated chat History array to everyone in the room over the internet
+        chatChannel.publish('message_packet', chatHistory);
     }
 
     function sendMessage() {
@@ -488,15 +503,12 @@
             id: Date.now() 
         };
 
-        let chatHistory = JSON.parse(localStorage.getItem(`chat_room_${currentRoomCode}`)) || [];
         chatHistory.push(messageObject);
-        localStorage.setItem(`chat_room_${currentRoomCode}`, JSON.stringify(chatHistory));
-
+        sendPayloadToNetwork();
         input.value = "";
-        loadMessages();
     }
 
-    /* --- TIC TAC TOE ENGINE --- */
+    /* --- TIC TAC TOE GAME ENGINE --- */
     function spawnTicTacToe() {
         toggleGamesDrawer();
         const GameObject = {
@@ -511,14 +523,11 @@
             guestName: playerRole === "O" ? myNickname : "Guest",
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-        let chatHistory = JSON.parse(localStorage.getItem(`chat_room_${currentRoomCode}`)) || [];
         chatHistory.push(GameObject);
-        localStorage.setItem(`chat_room_${currentRoomCode}`, JSON.stringify(chatHistory));
-        loadMessages();
+        sendPayloadToNetwork();
     }
 
     function makeTttMove(gameId, cellIndex) {
-        let chatHistory = JSON.parse(localStorage.getItem(`chat_room_${currentRoomCode}`)) || [];
         let gameObj = chatHistory.find(item => item.id === gameId);
 
         if (!gameObj || gameObj.winner || gameObj.isDraw || gameObj.grid[cellIndex] !== "") return;
@@ -528,46 +537,45 @@
         if(playerRole === "X") gameObj.hostName = myNickname;
         if(playerRole === "O") gameObj.guestName = myNickname;
 
-        const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        const winPatterns = [
+            [0,1,2], [3,4,5], [6,7,8], // Rows
+            [0,3,6], [1,4,7], [2,5,8], // Cols
+            [0,4,8], [2,4,6]           // Diagonals
+        ];
         let won = winPatterns.some(p => p.every(idx => gameObj.grid[idx] === playerRole));
 
         if (won) gameObj.winner = playerRole;
         else if (!gameObj.grid.includes("")) gameObj.isDraw = true;
         else gameObj.turn = gameObj.turn === "X" ? "O" : "X";
 
-        localStorage.setItem(`chat_room_${currentRoomCode}`, JSON.stringify(chatHistory));
-        loadMessages();
+        sendPayloadToNetwork();
     }
 
-    /* --- CONNECT 4 ENGINE --- */
+    /* --- CONNECT 4 GAME ENGINE --- */
     function spawnConnectFour() {
         toggleGamesDrawer();
         const GameObject = {
             type: "game_c4",
             id: "c4_" + Date.now(),
             creatorName: myNickname,
-            grid: Array(42).fill(""), // 6 rows x 7 columns grid layout
-            turn: "X", // X (Red) starts first
+            grid: Array(42).fill(""),
+            turn: "X",
             winner: null,
             isDraw: false,
             hostName: playerRole === "X" ? myNickname : "Host",
             guestName: playerRole === "O" ? myNickname : "Guest",
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-        let chatHistory = JSON.parse(localStorage.getItem(`chat_room_${currentRoomCode}`)) || [];
         chatHistory.push(GameObject);
-        localStorage.setItem(`chat_room_${currentRoomCode}`, JSON.stringify(chatHistory));
-        loadMessages();
+        sendPayloadToNetwork();
     }
 
     function makeC4Move(gameId, colIndex) {
-        let chatHistory = JSON.parse(localStorage.getItem(`chat_room_${currentRoomCode}`)) || [];
         let gameObj = chatHistory.find(item => item.id === gameId);
 
         if (!gameObj || gameObj.winner || gameObj.isDraw) return;
         if (gameObj.turn !== playerRole) { alert("It's not your turn!"); return; }
 
-        // Gravity check: find lowest empty cell in clicked column
         let targetIndex = -1;
         for (let row = 5; row >= 0; row--) {
             let cellIdx = row * 7 + colIndex;
@@ -577,7 +585,7 @@
             }
         }
 
-        if (targetIndex === -1) return; // Column full!
+        if (targetIndex === -1) return;
 
         gameObj.grid[targetIndex] = playerRole;
         if(playerRole === "X") gameObj.hostName = myNickname;
@@ -591,33 +599,28 @@
             gameObj.turn = gameObj.turn === "X" ? "O" : "X";
         }
 
-        localStorage.setItem(`chat_room_${currentRoomCode}`, JSON.stringify(chatHistory));
-        loadMessages();
+        sendPayloadToNetwork();
     }
 
     function checkC4Win(grid, player) {
-        // Horizontal check
         for (let r = 0; r < 6; r++) {
             for (let c = 0; c < 4; c++) {
                 let i = r * 7 + c;
                 if (grid[i]==player && grid[i+1]==player && grid[i+2]==player && grid[i+3]==player) return true;
             }
         }
-        // Vertical check
         for (let r = 0; r < 3; r++) {
             for (let c = 0; c < 7; c++) {
                 let i = r * 7 + c;
                 if (grid[i]==player && grid[i+7]==player && grid[i+14]==player && grid[i+21]==player) return true;
             }
         }
-        // Diagonal Down-Right
         for (let r = 0; r < 3; r++) {
             for (let c = 0; c < 4; c++) {
                 let i = r * 7 + c;
                 if (grid[i]==player && grid[i+8]==player && grid[i+16]==player && grid[i+24]==player) return true;
             }
         }
-        // Diagonal Up-Right
         for (let r = 3; r < 6; r++) {
             for (let c = 0; c < 4; c++) {
                 let i = r * 7 + c;
@@ -627,11 +630,10 @@
         return false;
     }
 
-    /* --- DATA RENDERING MATRIX ENGINE --- */
-    function loadMessages() {
+    /* --- LIVE RENDERING ENGINE --- */
+    function renderMessages() {
         const container = document.getElementById('chat-messages-container');
         container.innerHTML = ""; 
-        let chatHistory = JSON.parse(localStorage.getItem(`chat_room_${currentRoomCode}`)) || [];
         
         chatHistory.forEach(item => {
             const isMe = (item.creatorName === myNickname);
@@ -666,12 +668,12 @@
 
                 let activeColor = item.turn === "X" ? "Red" : "Yellow";
                 let statusText = item.winner ? `🎉 ${(item.winner==="X"?item.hostName:item.guestName)} Wins!` : (item.isDraw ? "🤝 Draw!" : (item.turn === playerRole ? `👉 Your Turn! (${activeColor})` : `⏳ Waiting (${activeColor})...`));
-                const senderLabel = isMe ? '' : `<span class="msg-sender">${item.creatorName} (Connect 4 Challenge)</span>`;
+                const senderLabel = isMe ? '' : `<span class="msg-sender">${item.creatorName} (Connect 4)</span>`;
 
                 let gridHTML = `${senderLabel}<div class="game-title">🔴 Connect 4 🟡</div><div class="c4-grid">`;
                 item.grid.forEach((val, idx) => {
                     let cellClass = val === "X" ? "p1" : (val === "O" ? "p2" : "");
-                    let colIdx = idx % 7; // Clicking a cell passes the entire column calculation to the drop engine
+                    let colIdx = idx % 7;
                     gridHTML += `<div class="c4-cell ${cellClass}" onclick="makeC4Move('${item.id}', ${colIdx})"></div>`;
                 });
                 gridHTML += `</div><div class="game-status">${statusText}</div><span class="msg-meta">${item.timestamp}</span>`;
@@ -683,13 +685,11 @@
         container.scrollTop = container.scrollHeight;
     }
 
-    function handleStorageUpdate(e) {
-        if (e.key === `chat_room_${currentRoomCode}`) loadMessages();
-    }
-
     function leaveChat() {
-        window.removeEventListener('storage', handleStorageUpdate);
-        resetForm('host-screen'); resetForm('join-screen');
+        if (ablyClient) ablyClient.close();
+        chatHistory = [];
+        resetForm('host-screen'); 
+        resetForm('join-screen');
         showScreen('lobby-screen');
     }
 </script>

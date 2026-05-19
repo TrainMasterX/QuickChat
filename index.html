@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuickChat App Live</title>
-    <!-- Include the Ably Live Messaging Network Library -->
-    <script src="https://ably.com"></script>
+    <title>QuickChat P2P App</title>
     <style>
         :root {
             --bg-color: #e5ddd5;
@@ -18,360 +16,101 @@
             --error-color: #ea0038;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-
-        body {
-            background-color: #f0f2f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 450px;
-            height: 90vh;
-            background: #fff;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            border-radius: 10px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        .screen {
-            display: none;
-            flex-direction: column;
-            height: 100%;
-            width: 100%;
-        }
-
-        .screen.active {
-            display: flex;
-        }
-
-        #lobby-screen {
-            justify-content: center;
-            align-items: center;
-            padding: 30px;
-            text-align: center;
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
-            color: white;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .container { width: 100%; max-width: 450px; height: 90vh; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+        .screen { display: none; flex-direction: column; height: 100%; width: 100%; }
+        .screen.active { display: flex; }
+        #lobby-screen { justify-content: center; align-items: center; padding: 30px; text-align: center; background: linear-gradient(135deg, var(--primary-color), var(--primary-light)); color: white; }
         h1 { margin-bottom: 30px; font-weight: 600; font-size: 2rem;}
-
-        .btn {
-            width: 100%;
-            padding: 15px;
-            margin: 10px 0;
-            border: none;
-            border-radius: 25px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
+        .btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 25px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s ease; }
         .btn-primary { background-color: #fff; color: var(--primary-color); }
-        .btn-primary:hover { background-color: #f0f0f0; }
         .btn-secondary { background-color: rgba(255,255,255,0.2); color: white; border: 1px solid white;}
-        .btn-secondary:hover { background-color: rgba(255,255,255,0.3); }
-
-        .setup-box {
-            padding: 30px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-        }
-
-        .setup-box h2 { color: var(--primary-color); margin-bottom: 15px; }
-        .setup-box p { text-align: center; color: #666; font-size: 0.95rem; }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 12px 20px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 25px;
-            font-size: 1rem;
-            outline: none;
-            transition: border 0.2s ease;
-        }
-
-        input.input-error {
-            border: 2px solid var(--error-color) !important;
-            background-color: #fff0f2;
-        }
-
-        .error-message {
-            color: var(--error-color);
-            font-size: 0.85rem;
-            margin-top: -5px;
-            margin-bottom: 10px;
-            display: none;
-            font-weight: bold;
-        }
-
-        .code-display {
-            background: #f0f2f5;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            letter-spacing: 2px;
-            color: var(--primary-light);
-            margin: 15px 0;
-            border: 2px dashed var(--primary-light);
-            width: 100%;
-            text-align: center;
-        }
-
-        .chat-header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .chat-room-info { font-weight: bold; }
-
-        .chat-messages {
-            flex: 1;
-            background-color: var(--bg-color);
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .msg {
-            max-width: 80%;
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            line-height: 1.4;
-            position: relative;
-            word-wrap: break-word;
-        }
-
-        .msg.sent {
-            background-color: var(--chat-bubble-out);
-            align-self: flex-end;
-            border-top-right-radius: 0;
-        }
-
-        .msg.received {
-            background-color: var(--chat-bubble-in);
-            align-self: flex-start;
-            border-top-left-radius: 0;
-        }
-
-        .msg-sender {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: bold;
-            color: var(--sender-name-color);
-            margin-bottom: 3px;
-        }
-
-        .msg-meta {
-            font-size: 0.7rem;
-            color: #777;
-            text-align: right;
-            margin-top: 4px;
-            display: block;
-        }
-
-        .chat-input-area {
-            background-color: #f0f2f5;
-            padding: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            position: relative;
-        }
-
-        .chat-input-area input {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 20px;
-            outline: none;
-            font-size: 1rem;
-        }
-
-        .action-btn {
-            background-color: var(--primary-light);
-            color: white;
-            border: none;
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 1.4rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: background 0.2s;
-            flex-shrink: 0;
-        }
-        
-        .action-btn:hover { background-color: var(--primary-color); }
-        .back-btn { background: none; border: none; color: white; cursor: pointer; font-size: 1rem; }
-
-        .games-menu {
-            position: absolute;
-            bottom: 65px;
-            left: 10px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            padding: 10px;
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 10;
-            width: 160px;
-        }
-
+        .setup-box { padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; overflow-y: auto; }
+        .setup-box h2 { color: var(--primary-color); margin-bottom: 10px; }
+        .setup-box p { text-align: center; color: #666; font-size: 0.9rem; margin-bottom: 8px; }
+        input[type="text"], textarea { width: 100%; padding: 12px 20px; margin: 8px 0; border: 1px solid #ccc; border-radius: 20px; font-size: 0.9rem; outline: none; }
+        textarea { height: 80px; resize: none; border-radius: 10px; font-family: monospace; font-size: 0.75rem; }
+        .chat-header { background-color: var(--primary-color); color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between; }
+        .chat-messages { flex: 1; background-color: var(--bg-color); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .msg { max-width: 80%; padding: 8px 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.4; position: relative; word-wrap: break-word; }
+        .msg.sent { background-color: var(--chat-bubble-out); align-self: flex-end; border-top-right-radius: 0; }
+        .msg.received { background-color: var(--chat-bubble-in); align-self: flex-start; border-top-left-radius: 0; }
+        .msg-sender { display: block; font-size: 0.75rem; font-weight: bold; color: var(--sender-name-color); margin-bottom: 3px; }
+        .msg-meta { font-size: 0.7rem; color: #777; text-align: right; margin-top: 4px; display: block; }
+        .chat-input-area { background-color: #f0f2f5; padding: 10px; display: flex; align-items: center; gap: 10px; position: relative; }
+        .chat-input-area input { flex: 1; padding: 12px; border: none; border-radius: 20px; outline: none; font-size: 1rem; }
+        .action-btn { background-color: var(--primary-light); color: white; border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-size: 1.4rem; display: flex; justify-content: center; align-items: center; transition: background 0.2s; flex-shrink: 0; }
+        .games-menu { position: absolute; bottom: 65px; left: 10px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); padding: 10px; display: none; flex-direction: column; gap: 8px; z-index: 10; width: 160px; }
         .games-menu.active { display: flex; }
-
-        .game-menu-item {
-            padding: 10px;
-            background: #f0f2f5;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.9rem;
-            text-align: center;
-            color: var(--text-color);
-        }
-        .game-menu-item:hover { background: #e2e5e9; }
-
-        .game-title {
-            font-size: 0.85rem;
-            font-weight: bold;
-            color: var(--primary-color);
-            text-align: center;
-            margin-bottom: 6px;
-            border-bottom: 1px solid rgba(0,0,0,0.08);
-            padding-bottom: 4px;
-        }
-        
-        .game-status {
-            font-size: 0.75rem;
-            text-align: center;
-            margin-top: 6px;
-            font-weight: bold;
-            color: #444;
-        }
-
+        .game-menu-item { padding: 10px; background: #f0f2f5; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9rem; text-align: center; }
+        .game-title { font-size: 0.85rem; font-weight: bold; color: var(--primary-color); text-align: center; margin-bottom: 6px; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 4px; }
+        .game-status { font-size: 0.75rem; text-align: center; margin-top: 6px; font-weight: bold; color: #444; }
         .msg-ttt { width: 240px; }
-        .ttt-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 4px;
-            background-color: rgba(0,0,0,0.12);
-            padding: 4px;
-            border-radius: 6px;
-        }
-        .ttt-cell {
-            background: white;
-            height: 55px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.4rem;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-            border-radius: 4px;
-        }
-        .ttt-cell.taken { cursor: not-allowed; }
-        .ttt-cell:hover:not(.taken) { background: #f0f2f5; }
-
+        .ttt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background-color: rgba(0,0,0,0.12); padding: 4px; border-radius: 6px; }
+        .ttt-cell { background: white; height: 55px; display: flex; justify-content: center; align-items: center; font-size: 1.4rem; font-weight: bold; cursor: pointer; user-select: none; border-radius: 4px; }
         .msg-c4 { width: 290px; }
-        .c4-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 4px;
-            background-color: #0b53a7;
-            padding: 6px;
-            border-radius: 8px;
-        }
-        .c4-cell {
-            background: #f0f2f5;
-            aspect-ratio: 1;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
-        }
-        .c4-cell.p1 { background: #ea0038; cursor: not-allowed; }
-        .c4-cell.p2 { background: #ffd000; cursor: not-allowed; }
+        .c4-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; background-color: #0b53a7; padding: 6px; border-radius: 8px; }
+        .c4-cell { background: #f0f2f5; aspect-ratio: 1; border-radius: 50%; cursor: pointer; box-shadow: inset 0 2px 4px rgba(0,0,0,0.15); }
+        .c4-cell.p1 { background: #ea0038; }
+        .c4-cell.p2 { background: #ffd000; }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <!-- 1. LOBBY SCREEN -->
     <div id="lobby-screen" class="screen active">
-        <h1>QuickChat</h1>
-        <button class="btn btn-primary" onclick="showScreen('host-screen'); generateChatCode();">Start a Chat</button>
+        <h1>QuickChat P2P</h1>
+        <button class="btn btn-primary" onclick="startHostWorkflow()">Start a Chat</button>
         <button class="btn btn-secondary" onclick="showScreen('join-screen')">Join a Chat</button>
     </div>
 
+    <!-- 2. HOST SETUP SCREEN -->
     <div id="host-screen" class="screen">
         <div class="setup-box">
-            <h2>Host a Chat Room</h2>
-            <p>Your automatically generated code:</p>
-            <div id="generated-code" class="code-display">0000</div>
-            <p>Enter your nickname to host:</p>
-            <input type="text" id="host-name-input" placeholder="Your Name / Nickname" maxlength="15" oninput="clearError(this)">
-            <div id="host-name-error" class="error-message">Nickname is strictly required!</div>
-            <button class="btn btn-primary" style="background: var(--primary-light); color: white;" onclick="launchChat(true)">Create & Enter Chat</button>
-            <button class="btn btn-secondary" style="color: #666; border-color: #ccc;" onclick="resetForm('host-screen'); showScreen('lobby-screen');">Cancel</button>
+            <h2>1. Create Room</h2>
+            <input type="text" id="host-name-input" placeholder="Your Nickname">
+            <button class="btn btn-primary" style="background: var(--primary-light); color: white;" onclick="generateHostOffer()">Generate Invitation Token</button>
+            
+            <p style="margin-top:10px;">Copy this token and send it to your friend:</p>
+            <textarea id="host-offer-token" readonly onclick="this.select()"></textarea>
+            
+            <p style="margin-top:10px;">Paste the confirmation token your friend sends back:</p>
+            <textarea id="host-answer-input" placeholder="Paste your friend's response token here..."></textarea>
+            <button class="btn btn-primary" style="background: #25d366; color: white;" onclick="connectAsHost()">Connect & Open Messenger</button>
+            <button class="btn btn-secondary" style="color: #666;" onclick="showScreen('lobby-screen')">Cancel</button>
         </div>
     </div>
 
+    <!-- 3. JOIN SETUP SCREEN -->
     <div id="join-screen" class="screen">
         <div class="setup-box">
-            <h2>Join Room</h2>
-            <p>Enter your nickname and the room code:</p>
-            <input type="text" id="join-name-input" placeholder="Your Name / Nickname" maxlength="15" oninput="clearError(this)">
-            <div id="join-name-error" class="error-message">Nickname is strictly required!</div>
-            <input type="text" id="join-code-input" placeholder="4-Digit Room Code" maxlength="4" oninput="clearError(this)">
-            <div id="join-code-error" class="error-message">Valid 4-digit code required!</div>
-            <button class="btn btn-primary" style="background: var(--primary-light); color: white;" onclick="launchChat(false)">Join Chat</button>
-            <button class="btn btn-secondary" style="color: #666; border-color: #ccc;" onclick="resetForm('join-screen'); showScreen('lobby-screen');">Back</button>
+            <h2>2. Join Room</h2>
+            <input type="text" id="join-name-input" placeholder="Your Nickname">
+            <p>Paste the invitation token your friend sent you:</p>
+            <textarea id="join-offer-input" placeholder="Paste invitation token here..."></textarea>
+            <button class="btn btn-primary" style="background: var(--primary-light); color: white;" onclick="generateGuestAnswer()">Generate Response Token</button>
+            
+            <p style="margin-top:10px;">Copy this response and send it back to the host:</p>
+            <textarea id="join-answer-token" readonly onclick="this.select()"></textarea>
+            <button class="btn btn-primary" style="background: #25d366; color: white;" onclick="connectAsGuest()">Enter Messenger</button>
+            <button class="btn btn-secondary" style="color: #666;" onclick="showScreen('lobby-screen')">Back</button>
         </div>
     </div>
 
+    <!-- 4. MAIN CHAT SCREEN -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
-            <button class="back-btn" onclick="leaveChat()">✕ Leave</button>
-            <div class="chat-room-info">Room: <span id="active-room-id">-</span></div>
+            <button class="action-btn" style="background:none; font-size:1rem;" onclick="location.reload()">✕ Exit</button>
+            <div style="font-weight:bold;">Direct Safe Link</div>
             <div id="user-role" style="font-size: 0.8rem; opacity: 0.8;"></div>
         </div>
-        
         <div class="chat-messages" id="chat-messages-container"></div>
-
         <div id="games-drawer" class="games-menu">
             <div class="game-menu-item" onclick="spawnTicTacToe()">❌ Tic-Tac-Toe ⭕</div>
             <div class="game-menu-item" onclick="spawnConnectFour()">🔴 Connect 4 🟡</div>
         </div>
-
         <div class="chat-input-area">
             <button class="action-btn" onclick="toggleGamesDrawer()">+</button>
             <input type="text" id="message-input" placeholder="Type a message" onkeypress="handleKeyPress(event)">
@@ -381,318 +120,217 @@
 </div>
 
 <script>
-    // PASTE YOUR SAFE PUBLISHABLE KEY HERE
-    const ABLY_PUBLISHABLE_KEY = "sb_publishable_4CCHmmMsBwaNrw1qwJKO0Q_jFHYrehV";
+    let peerConnection;
+    let dataChannel;
+    let myNickname = "";
+    let playerRole = ""; // "X" for host, "O" for guest
+    let chatHistory = [];
 
-    let ablyClient;
-    let chatChannel;
-    let currentRoomCode = "";
-    let myNickname = ""; 
-    let playerRole = ""; 
-    let chatHistory = []; // Keeps track of local messages array
+    // Standard STUN servers let the two browsers find each other globally across public routers
+    const rtcConfig = { iceServers: [{ urls: 'stun:://google.com' }] };
 
-    function showScreen(screenId) {
+    function showScreen(id) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById(screenId).classList.add('active');
+        document.getElementById(id).classList.add('active');
     }
 
-    function generateChatCode() {
-        currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
-        document.getElementById('generated-code').innerText = currentRoomCode;
-    }
+    function toggleGamesDrawer() { document.getElementById('games-drawer').classList.toggle('active'); }
+    function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
 
-    function clearError(inputElement) {
-        inputElement.classList.remove('input-error');
-        const errorDiv = document.getElementById(inputElement.id + '-error');
-        if(errorDiv) errorDiv.style.display = 'none';
-    }
-
-    function resetForm(screenId) {
-        const screen = document.getElementById(screenId);
-        screen.querySelectorAll('input').forEach(input => {
-            input.value = "";
-            clearError(input);
-        });
-    }
-
-    function launchChat(isHost) {
-        let hasErrors = false;
-
-        if (isHost) {
-            const hostInput = document.getElementById('host-name-input');
-            const hostName = hostInput.value.trim();
-            if (hostName === "") {
-                hostInput.classList.add('input-error');
-                document.getElementById('host-name-error').style.display = 'block';
-                hasErrors = true;
-            } else {
-                myNickname = hostName;
-                playerRole = "X";
-            }
-        } else {
-            const joinNameInput = document.getElementById('join-name-input');
-            const joinCodeInput = document.getElementById('join-code-input');
-            const joinName = joinNameInput.value.trim();
-            const inputCode = joinCodeInput.value.trim();
-            
-            if (joinName === "") {
-                joinNameInput.classList.add('input-error');
-                document.getElementById('join-name-error').style.display = 'block';
-                hasErrors = true;
-            }
-            if (inputCode.length !== 4 || isNaN(inputCode)) {
-                joinCodeInput.classList.add('input-error');
-                document.getElementById('join-code-error').style.display = 'block';
-                hasErrors = true;
-            }
-
-            if (!hasErrors) {
-                currentRoomCode = inputCode;
-                myNickname = joinName;
-                playerRole = "O";
-            }
-        }
-
-        if (hasErrors) return;
-
-        document.getElementById('active-room-id').innerText = currentRoomCode;
-        document.getElementById('user-role').innerText = `${myNickname} (${playerRole === "X" ? "Red" : "Yellow"})`;
-        
-        // Connect to Ably Messaging Server Network
-        if (ABLY_PUBLISHABLE_KEY === "sb_publishable_4CCHmmMsBwaNrw1qwJKO0Q_jFHYrehV") {
-            alert("Error: You forgot to insert your Ably API key on line 197!");
-            return;
-        }
-
-        ablyClient = new Ably.Realtime(ABLY_PUBLISHABLE_KEY);
-        chatChannel = ablyClient.channels.get(`room_${currentRoomCode}`);
-
-        // Listen for data coming from the internet
-        chatChannel.subscribe('message_packet', (ablyMessage) => {
-            chatHistory = ablyMessage.data;
+    /* --- DATA SYNCHRONIZATION VIA WEBRTC --- */
+    function initDataChannelListeners() {
+        dataChannel.onopen = () => {
+            document.getElementById('user-role').innerText = `${myNickname} (${playerRole === "X" ? "Red" : "Yellow"})`;
+            showScreen('chat-screen');
+        };
+        dataChannel.onmessage = (event) => {
+            chatHistory = JSON.parse(event.data);
             renderMessages();
-        });
+        };
+    }
 
-        showScreen('chat-screen');
+    function broadcastState() {
+        if (dataChannel && dataChannel.readyState === "open") {
+            dataChannel.send(JSON.stringify(chatHistory));
+        }
         renderMessages();
     }
 
-    function toggleGamesDrawer() {
-        document.getElementById('games-drawer').classList.toggle('active');
+    /* --- HOST WORKFLOW --- */
+    function startHostWorkflow() {
+        playerRole = "X";
+        peerConnection = new RTCPeerConnection(rtcConfig);
+        dataChannel = peerConnection.createDataChannel("chat-channel");
+        initDataChannelListeners();
+
+        peerConnection.onicecandidate = (e) => {
+            if (!e.candidate) {
+                // Formatting fully structured room payload token
+                document.getElementById('host-offer-token').value = btoa(JSON.stringify(peerConnection.localDescription));
+            }
+        };
+        showScreen('host-screen');
     }
 
-    function handleKeyPress(e) {
-        if (e.key === 'Enter') sendMessage();
+    async function generateHostOffer() {
+        const name = document.getElementById('host-name-input').value.trim();
+        if(!name) { alert("Nickname is required!"); return; }
+        myNickname = name;
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
     }
 
-    function sendPayloadToNetwork() {
-        // Broadcasts the updated chat History array to everyone in the room over the internet
-        chatChannel.publish('message_packet', chatHistory);
+    async function connectAsHost() {
+        const answerRaw = document.getElementById('host-answer-input').value.trim();
+        if(!answerRaw) { alert("Please paste your friend's response token!"); return; }
+        const answerDesc = new RTCSessionDescription(JSON.parse(atob(answerRaw)));
+        await peerConnection.setRemoteDescription(answerDesc);
     }
 
+    /* --- GUEST WORKFLOW --- */
+    async function generateGuestAnswer() {
+        const name = document.getElementById('join-name-input').value.trim();
+        const offerRaw = document.getElementById('join-offer-input').value.trim();
+        if(!name || !offerRaw) { alert("Nickname and Invitation token are required!"); return; }
+        myNickname = name;
+        playerRole = "O";
+
+        peerConnection = new RTCPeerConnection(rtcConfig);
+        peerConnection.ondatachannel = (e) => {
+            dataChannel = e.channel;
+            initDataChannelListeners();
+        };
+
+        peerConnection.onicecandidate = (e) => {
+            if (!e.candidate) {
+                document.getElementById('join-answer-token').value = btoa(JSON.stringify(peerConnection.localDescription));
+            }
+        };
+
+        const offerDesc = new RTCSessionDescription(JSON.parse(atob(offerRaw)));
+        await peerConnection.setRemoteDescription(offerDesc);
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+    }
+
+    function connectAsGuest() {
+        if(!dataChannel) alert("Waiting on direct hardware handshakes... Please ensure your token was parsed.");
+    }
+
+    /* --- APPLICATION CHAT & GAME ENGINE LOGIC --- */
     function sendMessage() {
         const input = document.getElementById('message-input');
         const text = input.value.trim();
         if (text === "") return;
 
-        const messageObject = {
-            type: "text",
-            creatorName: myNickname,
-            text: text,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            id: Date.now() 
-        };
-
-        chatHistory.push(messageObject);
-        sendPayloadToNetwork();
+        chatHistory.push({
+            type: "text", creatorName: myNickname, text: text,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), id: Date.now()
+        });
         input.value = "";
+        broadcastState();
     }
 
-    /* --- TIC TAC TOE GAME ENGINE --- */
     function spawnTicTacToe() {
         toggleGamesDrawer();
-        const GameObject = {
-            type: "game_ttt",
-            id: "ttt_" + Date.now(),
-            creatorName: myNickname,
-            grid: ["", "", "", "", "", "", "", "", ""],
-            turn: "X",
-            winner: null,
-            isDraw: false,
-            hostName: playerRole === "X" ? myNickname : "Host",
-            guestName: playerRole === "O" ? myNickname : "Guest",
+        chatHistory.push({
+            type: "game_ttt", id: "ttt_" + Date.now(), creatorName: myNickname,
+            grid: ["", "", "", "", "", "", "", "", ""], turn: "X", winner: null, isDraw: false,
+            hostName: playerRole === "X" ? myNickname : "Host", guestName: playerRole === "O" ? myNickname : "Guest",
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        chatHistory.push(GameObject);
-        sendPayloadToNetwork();
+        });
+        broadcastState();
     }
 
     function makeTttMove(gameId, cellIndex) {
         let gameObj = chatHistory.find(item => item.id === gameId);
-
-        if (!gameObj || gameObj.winner || gameObj.isDraw || gameObj.grid[cellIndex] !== "") return;
-        if (gameObj.turn !== playerRole) { alert("It's not your turn!"); return; }
+        if (!gameObj || gameObj.winner || gameObj.isDraw || gameObj.grid[cellIndex] !== "" || gameObj.turn !== playerRole) return;
 
         gameObj.grid[cellIndex] = playerRole;
-        if(playerRole === "X") gameObj.hostName = myNickname;
-        if(playerRole === "O") gameObj.guestName = myNickname;
-
-        const winPatterns = [
-            [0,1,2], [3,4,5], [6,7,8], // Rows
-            [0,3,6], [1,4,7], [2,5,8], // Cols
-            [0,4,8], [2,4,6]           // Diagonals
-        ];
+        const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
         let won = winPatterns.some(p => p.every(idx => gameObj.grid[idx] === playerRole));
 
         if (won) gameObj.winner = playerRole;
         else if (!gameObj.grid.includes("")) gameObj.isDraw = true;
         else gameObj.turn = gameObj.turn === "X" ? "O" : "X";
-
-        sendPayloadToNetwork();
+        broadcastState();
     }
 
-    /* --- CONNECT 4 GAME ENGINE --- */
     function spawnConnectFour() {
         toggleGamesDrawer();
-        const GameObject = {
-            type: "game_c4",
-            id: "c4_" + Date.now(),
-            creatorName: myNickname,
-            grid: Array(42).fill(""),
-            turn: "X",
-            winner: null,
-            isDraw: false,
-            hostName: playerRole === "X" ? myNickname : "Host",
-            guestName: playerRole === "O" ? myNickname : "Guest",
+        chatHistory.push({
+            type: "game_c4", id: "c4_" + Date.now(), creatorName: myNickname, grid: Array(42).fill(""),
+            turn: "X", winner: null, isDraw: false, hostName: playerRole === "X" ? myNickname : "Host", guestName: playerRole === "O" ? myNickname : "Guest",
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        chatHistory.push(GameObject);
-        sendPayloadToNetwork();
+        });
+        broadcastState();
     }
 
     function makeC4Move(gameId, colIndex) {
         let gameObj = chatHistory.find(item => item.id === gameId);
-
-        if (!gameObj || gameObj.winner || gameObj.isDraw) return;
-        if (gameObj.turn !== playerRole) { alert("It's not your turn!"); return; }
+        if (!gameObj || gameObj.winner || gameObj.isDraw || gameObj.turn !== playerRole) return;
 
         let targetIndex = -1;
         for (let row = 5; row >= 0; row--) {
             let cellIdx = row * 7 + colIndex;
-            if (gameObj.grid[cellIdx] === "") {
-                targetIndex = cellIdx;
-                break;
-            }
+            if (gameObj.grid[cellIdx] === "") { targetIndex = cellIdx; break; }
         }
-
         if (targetIndex === -1) return;
 
         gameObj.grid[targetIndex] = playerRole;
-        if(playerRole === "X") gameObj.hostName = myNickname;
-        if(playerRole === "O") gameObj.guestName = myNickname;
-
-        if (checkC4Win(gameObj.grid, playerRole)) {
-            gameObj.winner = playerRole;
-        } else if (!gameObj.grid.includes("")) {
-            gameObj.isDraw = true;
-        } else {
-            gameObj.turn = gameObj.turn === "X" ? "O" : "X";
-        }
-
-        sendPayloadToNetwork();
+        if (checkC4Win(gameObj.grid, playerRole)) gameObj.winner = playerRole;
+        else if (!gameObj.grid.includes("")) gameObj.isDraw = true;
+        else gameObj.turn = gameObj.turn === "X" ? "O" : "X";
+        broadcastState();
     }
 
-    function checkC4Win(grid, player) {
-        for (let r = 0; r < 6; r++) {
-            for (let c = 0; c < 4; c++) {
-                let i = r * 7 + c;
-                if (grid[i]==player && grid[i+1]==player && grid[i+2]==player && grid[i+3]==player) return true;
-            }
-        }
-        for (let r = 0; r < 3; r++) {
-            for (let c = 0; c < 7; c++) {
-                let i = r * 7 + c;
-                if (grid[i]==player && grid[i+7]==player && grid[i+14]==player && grid[i+21]==player) return true;
-            }
-        }
-        for (let r = 0; r < 3; r++) {
-            for (let c = 0; c < 4; c++) {
-                let i = r * 7 + c;
-                if (grid[i]==player && grid[i+8]==player && grid[i+16]==player && grid[i+24]==player) return true;
-            }
-        }
-        for (let r = 3; r < 6; r++) {
-            for (let c = 0; c < 4; c++) {
-                let i = r * 7 + c;
-                if (grid[i]==player && grid[i-6]==player && grid[i-12]==player && grid[i-18]==player) return true;
-            }
-        }
+    function checkC4Win(g, p) {
+        for (let r=0; r<6; r++) for (let c=0; c<4; c++) if (g[r*7+c]==p && g[r*7+c+1]==p && g[r*7+c+2]==p && g[r*7+c+3]==p) return true;
+        for (let r=0; r<3; r++) for (let c=0; c<7; c++) if (g[r*7+c]==p && g[r*7+c+7]==p && g[r*7+c+14]==p && g[r*7+c+21]==p) return true;
+        for (let r=0; r<3; r++) for (let c=0; c<4; c++) if (g[r*7+c]==p && g[r*7+c+8]==p && g[r*7+c+16]==p && g[r*7+c+24]==p) return true;
+        for (let r=3; r<6; r++) for (let c=0; c<4; c++) if (g[r*7+c]==p && g[r*7+c-6]==p && g[r*7+c-12]==p && g[r*7+c-18]==p) return true;
         return false;
     }
 
-    /* --- LIVE RENDERING ENGINE --- */
     function renderMessages() {
         const container = document.getElementById('chat-messages-container');
         container.innerHTML = ""; 
-        
         chatHistory.forEach(item => {
             const isMe = (item.creatorName === myNickname);
             const bubbleSide = isMe ? 'sent' : 'received';
+            const senderLabel = isMe ? '' : `<span class="msg-sender">${item.creatorName}</span>`;
 
             if (item.type === "text") {
                 const msgDiv = document.createElement('div');
                 msgDiv.className = `msg ${bubbleSide}`;
-                const senderLabel = isMe ? '' : `<span class="msg-sender">${item.creatorName}</span>`;
                 msgDiv.innerHTML = `${senderLabel}${item.text} <span class="msg-meta">${item.timestamp}</span>`;
                 container.appendChild(msgDiv);
             } 
             else if (item.type === "game_ttt") {
                 const gameBubble = document.createElement('div');
                 gameBubble.className = `msg ${bubbleSide} msg-ttt`;
-
-                let statusText = item.winner ? `🎉 ${(item.winner==="X"?item.hostName:item.guestName)} Wins!` : (item.isDraw ? "🤝 Draw!" : (item.turn === playerRole ? "👉 Your Turn!" : "⏳ Waiting..."));
-                const senderLabel = isMe ? '' : `<span class="msg-sender">${item.creatorName} (Tic-Tac-Toe)</span>`;
-
+                let sText = item.winner ? `🎉 ${(item.winner==="X"?item.hostName:item.guestName)} Wins!` : (item.isDraw ? "🤝 Draw!" : (item.turn === playerRole ? "👉 Your Turn!" : "⏳ Waiting..."));
                 let gridHTML = `${senderLabel}<div class="game-title">❌ Tic-Tac-Toe ⭕</div><div class="ttt-grid">`;
-                item.grid.forEach((val, idx) => {
-                    gridHTML += `<div class="ttt-cell ${val!==""?"taken":""}" onclick="makeTttMove('${item.id}', ${idx})">${val}</div>`;
-                });
-                gridHTML += `</div><div class="game-status">${statusText}</div><span class="msg-meta">${item.timestamp}</span>`;
-
+                item.grid.forEach((val, idx) => { gridHTML += `<div class="ttt-cell" onclick="makeTttMove('${item.id}', ${idx})">${val}</div>`; });
+                gridHTML += `</div><div class="game-status">${sText}</div><span class="msg-meta">${item.timestamp}</span>`;
                 gameBubble.innerHTML = gridHTML;
                 container.appendChild(gameBubble);
             }
             else if (item.type === "game_c4") {
                 const gameBubble = document.createElement('div');
                 gameBubble.className = `msg ${bubbleSide} msg-c4`;
-
                 let activeColor = item.turn === "X" ? "Red" : "Yellow";
-                let statusText = item.winner ? `🎉 ${(item.winner==="X"?item.hostName:item.guestName)} Wins!` : (item.isDraw ? "🤝 Draw!" : (item.turn === playerRole ? `👉 Your Turn! (${activeColor})` : `⏳ Waiting (${activeColor})...`));
-                const senderLabel = isMe ? '' : `<span class="msg-sender">${item.creatorName} (Connect 4)</span>`;
-
+                let sText = item.winner ? `🎉 ${(item.winner==="X"?item.hostName:item.guestName)} Wins!` : (item.isDraw ? "🤝 Draw!" : (item.turn === playerRole ? `👉 Your Turn!` : `⏳ Waiting...`));
                 let gridHTML = `${senderLabel}<div class="game-title">🔴 Connect 4 🟡</div><div class="c4-grid">`;
-                item.grid.forEach((val, idx) => {
-                    let cellClass = val === "X" ? "p1" : (val === "O" ? "p2" : "");
-                    let colIdx = idx % 7;
-                    gridHTML += `<div class="c4-cell ${cellClass}" onclick="makeC4Move('${item.id}', ${colIdx})"></div>`;
-                });
-                gridHTML += `</div><div class="game-status">${statusText}</div><span class="msg-meta">${item.timestamp}</span>`;
-
+                item.grid.forEach((val, idx) => { gridHTML += `<div class="c4-cell ${val==="X"?"p1":(val==="O"?"p2":"")}" onclick="makeC4Move('${item.id}', ${idx%7})"></div>`; });
+                gridHTML += `</div><div class="game-status">${sText}</div><span class="msg-meta">${item.timestamp}</span>`;
                 gameBubble.innerHTML = gridHTML;
                 container.appendChild(gameBubble);
             }
         });
         container.scrollTop = container.scrollHeight;
     }
-
-    function leaveChat() {
-        if (ablyClient) ablyClient.close();
-        chatHistory = [];
-        resetForm('host-screen'); 
-        resetForm('join-screen');
-        showScreen('lobby-screen');
-    }
 </script>
-
 </body>
 </html>
